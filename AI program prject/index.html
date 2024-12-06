@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platformer Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #gameCanvas { display: block; background-color: #87CEEB; }
+        #gameOver, #levelComplete { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: white; }
+        #restart-btn { display: none; position: absolute; top: 60%; left: 50%; transform: translateX(-50%); font-size: 20px; padding: 10px; background-color: black; color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="gameOver">Game Over!</div>
+<div id="levelComplete">Level Complete!</div>
+<button id="restart-btn">Restart</button>
+
+<script>
+// Set up the canvas and game context
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const restartBtn = document.getElementById("restart-btn");
+const gameOverElement = document.getElementById("gameOver");
+const levelCompleteElement = document.getElementById("levelComplete");
+
+let canvasWidth = window.innerWidth;
+let canvasHeight = window.innerHeight;
+
+canvas.width = canvasWidth;
+canvas.height = canvasHeight;
+
+// Player setup
+let player = {
+    x: 50,
+    y: canvasHeight - 70,
+    width: 20,
+    height: 20,
+    speed: 6,
+    dx: 0,
+    dy: 0,
+    gravity: 0.8,
+    jumpStrength: -20,
+    isJumping: false,
+    isCrouching: false
+};
+
+// Platforms
+let platforms = [
+    { x: 0, y: canvasHeight - 50, width: canvasWidth, height: 50 },
+    { x: 0.45 * canvasWidth, y: canvasHeight - 150, width: 200, height: 10 },
+    { x: 0.7 * canvasWidth, y: canvasHeight - 330, width: 150, height: 10 },
+    { x: 0.2 * canvasWidth, y: canvasHeight - 340, width: 205, height: 10 },
+    { x: 0.5 * canvasWidth, y: canvasHeight - 450, width: 200, height: 10 },
+    { x: 0. * canvasWidth, y: canvasHeight - 550, width: 130, height: 10 },
+    { x: 0.22 * canvasWidth, y: canvasHeight - 700, width: 25, height: 10 },
+    { x: 0.38 * canvasWidth, y: canvasHeight - 800, width: 50, height: 10 },
+    { x: 0.74 * canvasWidth, y: canvasHeight - 600, width: 60, height: 10 },
+    { x: 0.92 * canvasWidth, y: canvasHeight - 750, width: 1, height: 10 },
+    { x: 0.8 * canvasWidth, y: canvasHeight - 860, width: 5, height: 10 },
+    { x: 0.55 * canvasWidth, y: canvasHeight - 860, width: 100, height: 10 }
+];
+
+// Initial enemy positions
+const initialEnemies = [
+    { x: 0.5 * canvasWidth, y: canvasHeight - 150, width: 40, height: 40, dx: 2 },
+    { x: 0.7 * canvasWidth, y: canvasHeight - 250, width: 40, height: 40, dx: 2 },
+    { x: 0.3 * canvasWidth, y: canvasHeight - 300, width: 40, height: 40, dx: 2 },
+    { x: 0.1 * canvasWidth, y: canvasHeight - 100, width: 40, height: 40, dx: 2 },
+    { x: 0.6 * canvasWidth, y: canvasHeight - 400, width: 40, height: 40, dx: 2 },
+    { x: 0.8 * canvasWidth, y: canvasHeight - 350, width: 40, height: 40, dx: 2 },
+    { x: 0.1 * canvasWidth, y: canvasHeight - 500, width: 40, height: 40, dx: 2 },
+    { x: 0.4 * canvasWidth, y: canvasHeight - 100, width: 40, height: 40, dx: 2 },
+    { x: 0.2 * canvasWidth, y: canvasHeight - 400, width: 40, height: 40, dx: 2 },
+    { x: 0.9 * canvasWidth, y: canvasHeight - 350, width: 40, height: 40, dx: 2 },
+    { x: 0.5 * canvasWidth, y: canvasHeight - 500, width: 40, height: 40, dx: 2 },
+];
+
+// Enemies
+let enemies = [...initialEnemies];
+
+// Endpoint (Goal)
+let endpoint = { x: canvasWidth - 950, y: canvasHeight - 870, width: 40, height: 40 };
+
+// Game state
+let isGameOver = false;
+
+// Resize canvas on window resize
+window.addEventListener("resize", () => {
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    resetGame();
+});
+
+// Keyboard controls
+let keys = {
+    w: false,
+    a: false,
+    d: false,
+    s: false
+};
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === "w" && !player.isJumping) {
+        player.dy = player.jumpStrength;
+        player.isJumping = true;
+    }
+    if (e.key === "a") player.dx = -player.speed;
+    if (e.key === "d") player.dx = player.speed;
+    if (e.key === "s") player.isCrouching = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === "a" || e.key === "d") player.dx = 0;
+    if (e.key === "s") player.isCrouching = false;
+});
+
+// Reset the enemies' positions
+function resetEnemies() {
+    enemies = initialEnemies.map(enemy => ({ ...enemy }));
+}
+
+// Reset the game state
+function resetGame() {
+    player = {
+        x: 50,
+        y: canvasHeight - 70,
+        width: 20,
+        height: 20,
+        speed: 6,
+        dx: 0,
+        dy: 0,
+        gravity: 0.8,
+        jumpStrength: -20,
+        isJumping: false,
+        isCrouching: false
+    };
+    isGameOver = false;
+    gameOverElement.style.display = "none";
+    levelCompleteElement.style.display = "none";
+    restartBtn.style.display = "none";
+    resetEnemies();
+}
+
+// Game over function
+function gameOver() {
+    isGameOver = true;
+    gameOverElement.style.display = "block";
+    restartBtn.style.display = "inline-block";
+    resetEnemies();
+}
+
+// Level complete function
+function levelComplete() {
+    levelCompleteElement.style.display = "block";
+    restartBtn.style.display = "inline-block";
+    resetEnemies();
+}
+
+// Restart game
+restartBtn.addEventListener('click', () => {
+    resetGame();
+    update();
+});
+
+// Clear the canvas
+function clear() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// Draw the player on canvas
+function drawPlayer() {
+    ctx.fillStyle = "green";
+    if (player.isCrouching) {
+        ctx.fillRect(player.x, player.y + 30, player.width, player.height / 2);
+    } else {
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+}
+
+// Draw platforms
+function drawPlatforms() {
+    ctx.fillStyle = "brown";
+    platforms.forEach(platform => ctx.fillRect(platform.x, platform.y, platform.width, platform.height));
+}
+
+// Draw enemies
+function drawEnemies() {
+    ctx.fillStyle = "red";
+    enemies.forEach(enemy => ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height));
+}
+
+// Draw endpoint
+function drawEndpoint() {
+    ctx.fillStyle = "gold";
+    ctx.fillRect(endpoint.x, endpoint.y, endpoint.width, endpoint.height);
+}
+
+// Update game objects
+function update() {
+    if (isGameOver) return;
+
+    clear();
+    drawPlatforms();
+    drawPlayer();
+    drawEnemies();
+    drawEndpoint();
+
+    // Update player position
+    player.x += player.dx;
+    player.y += player.dy;
+
+    // Apply gravity
+    if (player.y + player.height < canvasHeight) {
+        player.dy += player.gravity;
+    } else {
+        player.dy = 0;
+        player.y = canvasHeight - player.height;
+        player.isJumping = false;
+    }
+
+    // Check for collisions with platforms
+    platforms.forEach(platform => {
+        if (player.x < platform.x + platform.width &&
+            player.x + player.width > platform.x &&
+            player.y + player.height <= platform.y &&
+            player.y + player.height + player.dy >= platform.y) {
+            player.y = platform.y - player.height;
+            player.dy = 0;
+            player.isJumping = false;
+        }
+    });
+
+    // Check for collisions with enemies
+    enemies.forEach(enemy => {
+        if (player.x < enemy.x + enemy.width &&
+            player.x + player.width > enemy.x &&
+            player.y < enemy.y + enemy.height &&
+            player.y + player.height > enemy.y) {
+            gameOver();
+        }
+    });
+
+    // Check for reaching the endpoint
+    if (player.x < endpoint.x + endpoint.width &&
+        player.x + player.width > endpoint.x &&
+        player.y < endpoint.y + endpoint.height &&
+        player.y + player.height > endpoint.y) {
+        levelComplete();
+    }
+
+    // Update enemies' positions
+    enemies.forEach(enemy => {
+        enemy.x += enemy.dx;
+        if (enemy.x <= 0 || enemy.x + enemy.width >= canvas.width) {
+            enemy.dx = -enemy.dx;
+        }
+    });
+
+    requestAnimationFrame(update);
+}
+
+update();
+</script>
+
+</body>
+</html>
